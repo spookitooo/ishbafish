@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ku" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بەڕێوەبەر | Exchange Money</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Zain:wght@200;300;400;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .method-settings-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media(max-width: 768px) {
+            .method-settings-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-orb bg-orb-1"></div>
+    <div class="bg-orb bg-orb-2"></div>
+
+    <nav class="main-nav" id="main-nav"></nav>
+
+    <div class="page-container wide">
+        <div class="page-header">
+            <h2 data-i18n="admin_title">پانێلی بەڕێوەبەر</h2>
+            <p data-i18n="admin_subtitle">بەڕێوەبردنی مامەڵەکان و بەکارهێنەران</p>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-grid" id="admin-stats">
+            <div class="stat-card">
+                <div class="stat-label" data-i18n="total_transactions">کۆی مامەڵەکان</div>
+                <div class="stat-value gradient" id="stat-total">0</div>
+            </div>
+            <div class="stat-card" style="--stat-color: var(--color-pending)">
+                <div class="stat-label" data-i18n="pending">چاوەڕوان</div>
+                <div class="stat-value" id="stat-pending" style="color: var(--color-pending)">0</div>
+            </div>
+            <div class="stat-card" style="--stat-color: var(--color-completed)">
+                <div class="stat-label" data-i18n="total_volume">کۆی قەبارە (IQD)</div>
+                <div class="stat-value" id="stat-volume" style="color: var(--color-completed)">0</div>
+            </div>
+            <div class="stat-card" style="--stat-color: var(--accent-secondary)">
+                <div class="stat-label" data-i18n="total_fees">کۆی کرێ (IQD)</div>
+                <div class="stat-value" id="stat-fees" style="color: var(--accent-secondary)">0</div>
+            </div>
+            <div class="stat-card" style="--stat-color: var(--accent-tertiary)">
+                <div class="stat-label" data-i18n="total_users">کۆی بەکارهێنەران</div>
+                <div class="stat-value" id="stat-users" style="color: var(--accent-tertiary)">0</div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="admin-tabs" id="admin-tabs">
+            <button class="admin-tab active" onclick="switchTab(this, 'transactions')" data-i18n="all_transactions">هەموو مامەڵەکان</button>
+            <button class="admin-tab" onclick="switchTab(this, 'users')" data-i18n="all_users">هەموو بەکارهێنەران</button>
+            <button class="admin-tab" onclick="switchTab(this, 'settings')">ڕێکخستنی شێوازەکان (Settings)</button>
+        </div>
+
+        <!-- Filter Bar (transactions) -->
+        <div class="filter-bar" id="admin-filter-bar">
+            <button class="filter-btn active" onclick="adminFilter(this, '')"><span data-i18n="filter_all">هەمووی</span></button>
+            <button class="filter-btn" onclick="adminFilter(this, 'pending')"><span data-i18n="pending">چاوەڕوان</span></button>
+            <button class="filter-btn" onclick="adminFilter(this, 'approved')"><span data-i18n="approved">پەسەندکراو</span></button>
+            <button class="filter-btn" onclick="adminFilter(this, 'completed')"><span data-i18n="completed">تەواوبوو</span></button>
+            <button class="filter-btn" onclick="adminFilter(this, 'rejected')"><span data-i18n="rejected">ڕەتکراوە</span></button>
+        </div>
+
+        <!-- Content Area -->
+        <div id="admin-content"></div>
+    </div>
+
+    <!-- Admin Note Modal -->
+    <div id="modal-overlay" style="display:none; position:fixed; inset:0; z-index:200; background:rgba(0,0,0,0.6); backdrop-filter:blur(8px); flex-direction:column; align-items:center; justify-content:center;">
+        <div class="card" style="max-width:440px; width:90%; margin:auto;">
+            <h3 class="card-title" data-i18n="admin_note" id="modal-title">تێبینی بەڕێوەبەر</h3>
+            <div class="form-group">
+                <textarea id="modal-note" class="form-input" rows="3" style="resize:vertical;" placeholder="تێبینی..."></textarea>
+            </div>
+            <div style="display:flex; gap:10px; justify-content:flex-end;">
+                <button class="btn btn-secondary btn-sm" onclick="closeModal()"><span data-i18n="cancel">پاشگەزبوونەوە</span></button>
+                <button class="btn btn-primary btn-sm" id="modal-confirm-btn" onclick="confirmAction()"><span data-i18n="approve">پەسەندکردن</span></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Proof Image Modal -->
+    <div id="proof-modal-overlay" style="display:none; position:fixed; inset:0; z-index:300; background:rgba(0,0,0,0.85); backdrop-filter:blur(8px); flex-direction:column; align-items:center; justify-content:center;" onclick="closeProofModal()">
+        <img id="proof-modal-img" src="" style="max-width:90%; max-height:85vh; border-radius:8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);" onclick="event.stopPropagation()">
+        <button class="btn btn-secondary" style="margin-top:20px;" onclick="closeProofModal()">Close</button>
+    </div>
+
+    <script src="/js/i18n.js"></script>
+    <script src="/js/app.js"></script>
+    <script src="/js/admin.js"></script>
+</body>
+</html>

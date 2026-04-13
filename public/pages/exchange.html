@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ku" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ئاڵوگۆڕ | Exchange Money</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Zain:wght@200;300;400;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .wizard-step { display: none; animation: slideInX 0.3s ease-out; }
+        .wizard-step.active { display: block; }
+        .wizard-nav { display: flex; justify-content: space-between; margin-top: 24px; gap: 10px; }
+        
+        .upload-area {
+            border: 2px dashed var(--border-color);
+            background: var(--bg-input);
+            padding: 30px 20px;
+            text-align: center;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 20px;
+        }
+        .upload-area:hover {
+            border-color: var(--accent-primary);
+        }
+        .upload-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            color: var(--text-secondary);
+        }
+        #proof-preview {
+            max-width: 100%;
+            border-radius: 8px;
+            display: none;
+            margin-top: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .instructions-box {
+            background: rgba(108, 99, 255, 0.05);
+            border: 1px solid rgba(108, 99, 255, 0.2);
+            padding: 16px;
+            border-radius: var(--radius-md);
+            margin-bottom: 20px;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-orb bg-orb-1"></div>
+    <div class="bg-orb bg-orb-2"></div>
+
+    <nav class="main-nav" id="main-nav"></nav>
+
+    <nav class="mobile-nav" id="mobile-nav">
+        <div class="mobile-nav-links">
+            <a href="/exchange" class="mobile-nav-link active">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>
+                <span data-i18n="nav_exchange">ئاڵوگۆڕ</span>
+            </a>
+            <a href="/history" class="mobile-nav-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                <span data-i18n="nav_history">مێژوو</span>
+            </a>
+        </div>
+    </nav>
+
+    <div class="page-container">
+        <div class="page-header">
+            <h2 data-i18n="exchange_title">ئاڵوگۆڕی دراو</h2>
+            <p data-i18n="exchange_subtitle">داواکاری ئاڵوگۆڕی نوێ دروست بکە</p>
+        </div>
+
+        <div class="exchange-form-card" id="exchange-form-card">
+            <form id="exchange-form" autocomplete="off">
+                
+                <!-- STEP 1: Calculation -->
+                <div class="wizard-step active" id="step-1">
+                    <h3 class="card-title" style="margin-bottom:15px;" data-i18n="step_1">نگاوی 1: بڕەکە هەژمار بکە</h3>
+                    
+                    <div class="form-group">
+                        <label class="form-label" data-i18n="send_method">شێوازی ناردن</label>
+                        <select id="send-method" class="form-select" required>
+                            <option value="" data-i18n="select_method">شێوازێک هەڵبژێرە</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" data-i18n="you_send">تۆ دەنێریت (IQD)</label>
+                        <input type="number" id="send-amount" class="form-input" step="any" min="0.01" data-i18n-placeholder="enter_amount" placeholder="بڕەکە بنووسە" required>
+                    </div>
+
+                    <div class="swap-divider">
+                        <button type="button" id="swap-btn" onclick="swapMethods()" title="Swap">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>
+                        </button>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" data-i18n="receive_method">شێوازی وەرگرتن</label>
+                        <select id="receive-method" class="form-select" required>
+                            <option value="" data-i18n="select_method">شێوازێک هەڵبژێرە</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" data-i18n="you_receive">تۆ وەردەگریت (IQD)</label>
+                        <input type="text" id="receive-amount" class="form-input" readonly style="opacity: 0.7; cursor: default;">
+                    </div>
+
+                    <div class="preview-box" id="preview-box" style="display: none;">
+                        <div class="preview-row">
+                            <span class="preview-label" data-i18n="fee">کرێ</span>
+                            <span class="preview-value" id="preview-fee">—</span>
+                        </div>
+                        <div class="preview-row">
+                            <span class="preview-label" data-i18n="you_send">تۆ دەنێریت</span>
+                            <span class="preview-value" id="preview-send">—</span>
+                        </div>
+                        <div class="preview-row">
+                            <span class="preview-label" data-i18n="you_receive">تۆ وەردەگریت</span>
+                            <span class="preview-value highlight" id="preview-receive">—</span>
+                        </div>
+                    </div>
+
+                    <div id="pair-error-warning" data-i18n="pair_error" style="display: none; margin-top:16px; padding: 12px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; color: #fca5a5; font-size: 0.9rem; text-align: center; font-weight: 700;">
+                        ئەم ئاڵوگۆڕە بەردەست نییە.
+                    </div>
+
+                    <div class="wizard-nav" style="justify-content: flex-end;">
+                        <button type="button" class="btn btn-primary" id="btn-next-account" onclick="goToStep(2)" disabled>
+                            <span data-i18n="send_order">ناردنی داواکاری</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- STEP 2: Receiver Info -->
+                <div class="wizard-step" id="step-2">
+                    <h3 class="card-title" style="margin-bottom:15px;" data-i18n="step_2">نگاوی 2: زانیاری وەرگرتن</h3>
+                    <p style="color:var(--text-secondary); margin-bottom: 20px; font-size: 0.9rem;" id="receiver-prompt" data-i18n="receiver_prompt">تکایە زانیاریەکانی وەرگرتن بنووسە.</p>
+
+                    <div class="form-group">
+                        <label class="form-label" data-i18n="receiver_account">هەژماری وەرگر (Account Number / Wallet)</label>
+                        <input type="text" id="receiver-account" class="form-input" placeholder="..." required>
+                    </div>
+
+                    <div class="wizard-nav">
+                        <button type="button" class="btn btn-secondary" onclick="goToStep(1)">
+                            <span data-i18n="back">گەڕانەوە</span>
+                        </button>
+                        <button type="button" class="btn btn-primary" id="btn-next-payment" onclick="goToStep(3)">
+                            <span data-i18n="next">دواتر</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- STEP 3: Payment Instructions & Proof -->
+                <div class="wizard-step" id="step-3">
+                    <h3 class="card-title" style="margin-bottom:15px;" data-i18n="step_3">نگاوی 3: پارەدان و بەڵگە</h3>
+                    
+                    <div class="instructions-box">
+                        <strong id="instruction-title" style="display:block; margin-bottom:8px; font-size:1.05rem;">Please send money via ...</strong>
+                        <div id="instruction-text" style="white-space: pre-wrap;"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" data-i18n="upload_proof">وێنەی بەڵگەی پارەدان (Screenshot)</label>
+                        <input type="file" id="file-upload" accept="image/*" style="display:none;" onchange="handleProofUpload(event)">
+                        
+                        <div class="upload-area" onclick="document.getElementById('file-upload').click()">
+                            <div class="upload-icon">📸</div>
+                            <div style="font-weight:700; color:var(--text-primary);" data-i18n="tap_to_upload">کلت بکە بۆ وێنە دانان</div>
+                            <img id="proof-preview" src="" alt="Proof">
+                        </div>
+                        <input type="hidden" id="proof-b64" required>
+                    </div>
+
+                    <div class="wizard-nav">
+                        <button type="button" class="btn btn-secondary" onclick="goToStep(2)">
+                            <span data-i18n="back">گەڕانەوە</span>
+                        </button>
+                        <button type="button" class="btn btn-success" id="btn-complete" onclick="submitTransaction()">
+                            <span data-i18n="complete_order">تەواوکردنی داواکاری</span>
+                        </button>
+                    </div>
+                </div>
+
+            </form>
+        </div>
+
+        <div style="margin-top: 32px;">
+            <h3 class="card-title" data-i18n="history_title" style="margin-bottom: 16px;">مێژووی مامەڵەکان</h3>
+            <div id="recent-transactions" class="transaction-list">
+                <!-- populated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/i18n.js"></script>
+    <script src="/js/app.js"></script>
+    <script src="/js/exchange.js"></script>
+</body>
+</html>
