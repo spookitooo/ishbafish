@@ -30,13 +30,20 @@ app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'pag
 // Start
 async function start() {
     await initDatabase();
-    app.listen(PORT, () => {
-        console.log(`\n🚀 Exchange Money Platform running at http://localhost:${PORT}`);
-        console.log(`📋 Admin login: admin@exchange.com / admin123\n`);
-    });
+    if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+        app.listen(PORT, () => {
+            console.log(`\n🚀 Exchange Money Platform running at http://localhost:${PORT}`);
+            console.log(`📋 Admin login: admin@exchange.com / admin123\n`);
+        });
+    }
 }
 
 start().catch(err => {
     console.error('Failed to start server:', err);
-    process.exit(1);
+    // Don't exit on Vercel as it might kill the function context
+    if (!process.env.VERCEL) {
+        process.exit(1);
+    }
 });
+
+module.exports = app;

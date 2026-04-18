@@ -13,9 +13,15 @@ async function getDatabase() {
     const SQL = await initSqlJs();
 
     // Load existing database or create new
+    // On Vercel, the filesystem is read-only.
     if (fs.existsSync(DB_PATH)) {
-        const fileBuffer = fs.readFileSync(DB_PATH);
-        _db = new SQL.Database(fileBuffer);
+        try {
+            const fileBuffer = fs.readFileSync(DB_PATH);
+            _db = new SQL.Database(fileBuffer);
+        } catch (err) {
+            console.error('Error reading database file:', err);
+            _db = new SQL.Database();
+        }
     } else {
         _db = new SQL.Database();
     }
@@ -25,9 +31,20 @@ async function getDatabase() {
 
 function saveDatabase() {
     if (!_db) return;
-    const data = _db.export();
-    const buffer = Buffer.from(data);
-    fs.writeFileSync(DB_PATH, buffer);
+    
+    // Vercel filesystem is read-only. Cannot save to DB_PATH.
+    if (process.env.VERCEL) {
+        console.warn('⚠️ Running on Vercel: Database persistence is disabled (Read-only filesystem).');
+        return;
+    }
+
+    try {
+        const data = _db.export();
+        const buffer = Buffer.from(data);
+        fs.writeFileSync(DB_PATH, buffer);
+    } catch (err) {
+        console.error('Failed to save database:', err);
+    }
 }
 
 async function initDatabase() {
@@ -78,12 +95,14 @@ async function initDatabase() {
 }
 
 // Auto-save periodically
-setInterval(() => {
-    if (_db) saveDatabase();
-}, 10000);
+if (!process.env.VERCEL) {
+    setInterval(() => {
+        if (_db) saveDatabase();
+    }, 10000);
+}
 
 // Save on exit
-process.on('exit', () => { if (_db) saveDatabase(); });
-process.on('SIGINT', () => { if (_db) saveDatabase(); process.exit(); });
+process.on('exit', () => { if (_db && !process.env.VERCEL) saveDatabase(); });
+process.on('SIGINT', () => { if (_db && !process.env.VERCEL) saveDatabase(); process.exit(); });
 
 module.exports = { initDatabase, getDatabase, saveDatabase, DB_PATH };
