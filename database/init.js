@@ -3,7 +3,8 @@ const bcrypt = require('bcryptjs');
 const path = require('path');
 const fs = require('fs');
 
-const DB_PATH = path.join(__dirname, 'exchange.db');
+const DB_PATH = path.join(process.cwd(), 'database', 'exchange.db');
+const SCHEMA_PATH = path.join(process.cwd(), 'database', 'schema.sql');
 
 let _db = null;
 
@@ -49,15 +50,16 @@ function saveDatabase() {
 
 async function initDatabase() {
     console.log('🔄 Initializing database...');
+    console.log('📂 CWD:', process.cwd());
+    console.log('📂 DB_PATH:', DB_PATH);
     try {
         const db = await getDatabase();
         
-        console.log('📖 Reading schema.sql...');
-        const schemaPath = path.join(__dirname, 'schema.sql');
-        if (!fs.existsSync(schemaPath)) {
-            throw new Error(`schema.sql not found at ${schemaPath}`);
+        console.log('📖 Reading schema.sql at:', SCHEMA_PATH);
+        if (!fs.existsSync(SCHEMA_PATH)) {
+            throw new Error(`schema.sql not found at ${SCHEMA_PATH}. Files in folder: ${fs.readdirSync(path.dirname(SCHEMA_PATH)).join(', ')}`);
         }
-        const schema = fs.readFileSync(schemaPath, 'utf8');
+        const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
         db.run(schema);
         console.log('✅ Schema applied');
 
