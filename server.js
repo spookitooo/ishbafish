@@ -51,9 +51,7 @@ app.use(async (req, res, next) => {
 
     if (dbInitError) {
         return res.status(500).json({ 
-            error: 'Database initialization failed', 
-            details: dbInitError.message,
-            tip: 'Check Vercel logs for path or WASM errors.' 
+            error: `Database initialization failed: ${dbInitError.message}`
         });
     }
     next();
