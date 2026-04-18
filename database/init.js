@@ -48,11 +48,18 @@ function saveDatabase() {
 }
 
 async function initDatabase() {
-    const db = await getDatabase();
-
-    // Read and execute schema
-    const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
-    db.run(schema);
+    console.log('🔄 Initializing database...');
+    try {
+        const db = await getDatabase();
+        
+        console.log('📖 Reading schema.sql...');
+        const schemaPath = path.join(__dirname, 'schema.sql');
+        if (!fs.existsSync(schemaPath)) {
+            throw new Error(`schema.sql not found at ${schemaPath}`);
+        }
+        const schema = fs.readFileSync(schemaPath, 'utf8');
+        db.run(schema);
+        console.log('✅ Schema applied');
 
     // Seed default admin account
     const adminCheck = db.exec("SELECT id FROM users WHERE email = 'admin@exchange.com'");
@@ -90,8 +97,15 @@ async function initDatabase() {
         console.log('✅ Default method pair fees seeded');
     }
 
-    saveDatabase();
-    console.log('✅ Database initialized successfully');
+        if (!process.env.VERCEL) {
+            saveDatabase();
+        }
+        console.log('✅ Database initialized successfully');
+    } catch (err) {
+        console.error('❌ CRITICAL: Database initialization failed:', err);
+        // On Vercel, we want to know why it failed in the logs
+        throw err;
+    }
 }
 
 // Auto-save periodically

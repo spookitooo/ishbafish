@@ -27,6 +27,12 @@ app.get('/exchange', (req, res) => res.sendFile(path.join(__dirname, 'public', '
 app.get('/history', (req, res) => res.sendFile(path.join(__dirname, 'public', 'pages', 'history.html')));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'pages', 'admin.html')));
 
+// Root redirect
+app.get('/', (req, res) => res.redirect('/exchange'));
+
+// Health check
+app.get('/api/health', (req, res) => res.json({ status: 'ok', vercel: !!process.env.VERCEL }));
+
 // Start
 async function start() {
     await initDatabase();
