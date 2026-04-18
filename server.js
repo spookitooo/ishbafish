@@ -33,23 +33,36 @@ app.get('/', (req, res) => res.redirect('/exchange'));
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok', vercel: !!process.env.VERCEL }));
 
-// Start
-async function start() {
-    await initDatabase();
-    if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
-        app.listen(PORT, () => {
-            console.log(`\n🚀 Exchange Money Platform running at http://localhost:${PORT}`);
-            console.log(`📋 Admin login: admin@exchange.com / admin123\n`);
-        });
+let isDbInitialized = false;
+app.use(async (req, res, next) => {
+    if (!isDbInitialized) {
+        try {
+            console.log('🚀 Lazy-initializing database on first request...');
+            await initDatabase();
+            isDbInitialized = true;
+            console.log('✅ Lazy-initialization complete.');
+        } catch (err) {
+            console.error('❌ Lazy-initialization FAILED:', err);
+        }
     }
-}
-
-start().catch(err => {
-    console.error('Failed to start server:', err);
-    // Don't exit on Vercel as it might kill the function context
-    if (!process.env.VERCEL) {
-        process.exit(1);
-    }
+    next();
 });
+
+// Start local server if not on Vercel
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+    const startLocal = async () => {
+        try {
+            await initDatabase();
+            isDbInitialized = true;
+            app.listen(PORT, () => {
+                console.log(`\n🚀 Exchange Money Platform running at http://localhost:${PORT}`);
+                console.log(`📋 Admin login: admin@exchange.com / admin123\n`);
+            });
+        } catch (err) {
+            console.error('Failed to start local server:', err);
+        }
+    };
+    startLocal();
+}
 
 module.exports = app;
