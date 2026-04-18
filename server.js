@@ -34,16 +34,27 @@ app.get('/', (req, res) => res.redirect('/exchange'));
 app.get('/api/health', (req, res) => res.json({ status: 'ok', vercel: !!process.env.VERCEL }));
 
 let isDbInitialized = false;
+let dbInitError = null;
+
 app.use(async (req, res, next) => {
     if (!isDbInitialized) {
         try {
-            console.log('🚀 Lazy-initializing database on first request...');
+            console.log('🚀 Lazy-initializing database...');
             await initDatabase();
             isDbInitialized = true;
             console.log('✅ Lazy-initialization complete.');
         } catch (err) {
+            dbInitError = err;
             console.error('❌ Lazy-initialization FAILED:', err);
         }
+    }
+
+    if (dbInitError) {
+        return res.status(500).json({ 
+            error: 'Database initialization failed', 
+            details: dbInitError.message,
+            tip: 'Check Vercel logs for path or WASM errors.' 
+        });
     }
     next();
 });
