@@ -1,5 +1,4 @@
 const express = require('express');
-const { queryAll } = require('../middleware/auth');
 const { getDatabase } = require('../database/init');
 
 const router = express.Router();
@@ -9,7 +8,9 @@ const router = express.Router();
 router.get('/', async (req, res) => {
     try {
         const db = await getDatabase();
-        const methods = queryAll(db, 'SELECT * FROM payment_methods', []);
+        const snapshot = await db.collection('payment_methods').get();
+        const methods = [];
+        snapshot.forEach(doc => methods.push(doc.data()));
         res.json({ methods });
     } catch (err) {
         console.error('Failed to get methods:', err);

@@ -1,13 +1,13 @@
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     full_name TEXT NOT NULL,
     username TEXT UNIQUE,
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     role TEXT DEFAULT 'user' CHECK(role IN ('user', 'admin')),
     language TEXT DEFAULT 'ku' CHECK(language IN ('ku', 'en', 'ar')),
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Payment Methods Configuration
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS payment_methods (
 
 -- Transactions table
 CREATE TABLE IF NOT EXISTS transactions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL,
     send_method TEXT NOT NULL,
     receive_method TEXT NOT NULL,
@@ -31,8 +31,8 @@ CREATE TABLE IF NOT EXISTS transactions (
     proof_image TEXT NOT NULL,
     status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'rejected', 'completed')),
     admin_note TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id),
     FOREIGN KEY (send_method) REFERENCES payment_methods(id),
     FOREIGN KEY (receive_method) REFERENCES payment_methods(id)
@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS transactions (
 
 -- Method Fees configuration table
 CREATE TABLE IF NOT EXISTS method_fees (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     send_method TEXT NOT NULL,
     receive_method TEXT NOT NULL,
     base_amount REAL NOT NULL,

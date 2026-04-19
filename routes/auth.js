@@ -1,8 +1,8 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { authenticate, JWT_SECRET, queryOne, queryAll, runSql } = require('../middleware/auth');
-const { getDatabase, saveDatabase } = require('../database/init');
+const { authenticate, JWT_SECRET } = require('../middleware/auth');
+const { getDatabase } = require('../database/init');
 
 const router = express.Router();
 
@@ -22,7 +22,6 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ error: 'Invalid email format' });
         }
 
-        // Validate username if provided
         if (username) {
             if (username.length < 3) {
                 return res.status(400).json({ error: 'Username must be at least 3 characters' });
@@ -33,35 +32,45 @@ router.post('/register', async (req, res) => {
         }
 
         const db = await getDatabase();
-        const existing = queryOne(db, 'SELECT id FROM users WHERE email = ?', [email.toLowerCase()]);
-        if (existing) {
+        const emailCheck = await db.collection('users').where('email', '==', email.toLowerCase()).get();
+        if (!emailCheck.empty) {
             return res.status(409).json({ error: 'Email already registered' });
         }
 
-        // Check username uniqueness if provided
         if (username) {
-            const existingUsername = queryOne(db, 'SELECT id FROM users WHERE username = ?', [username.toLowerCase()]);
-            if (existingUsername) {
+            const usernameCheck = await db.collection('users').where('username', '==', username.toLowerCase()).get();
+            if (!usernameCheck.empty) {
                 return res.status(409).json({ error: 'Username already taken' });
             }
         }
 
         const password_hash = bcrypt.hashSync(password, 10);
-        const result = runSql(db,
-            'INSERT INTO users (full_name, username, email, password_hash, language) VALUES (?, ?, ?, ?, ?)',
-            [full_name, username ? username.toLowerCase() : null, email.toLowerCase(), password_hash, language || 'ku']
-        );
-        saveDatabase();
+        let role = 'user';
+        if (email.toLowerCase() === 'ayubnawzad199@gmail.com' || email.toLowerCase() === 'admin@exchange.com') {
+            role = 'admin';
+        }
 
-        const token = jwt.sign({ userId: result.lastInsertRowid }, JWT_SECRET, { expiresIn: '7d' });
-        const user = queryOne(db, 'SELECT id, full_name, username, email, role, language, created_at FROM users WHERE id = ?', [result.lastInsertRowid]);
+        const newUser = {
+            full_name,
+            username: username ? username.toLowerCase() : null,
+            email: email.toLowerCase(),
+            password_hash,
+            role,
+            language: language || 'ku',
+            created_at: new Date().toISOString()
+        };
 
-        res.status(201).json({ token, user });
+        const docRef = await db.collection('users').add(newUser);
+
+        const token = jwt.sign({ userId: docRef.id }, JWT_SECRET, { expiresIn: '7d' });
+
+        res.status(201).json({ 
+            token, 
+            user: { id: docRef.id, full_name: newUser.full_name, username: newUser.username, email: newUser.email, role: newUser.role, language: newUser.language, created_at: newUser.created_at } 
+        });
     } catch (err) {
         console.error('Register error:', err);
-        res.status(500).json({ 
-            error: `Server Error: ${err.message}`
-        });
+        res.status(500).json({ error: `Server Error: ${err.message}` });
     }
 });
 
@@ -69,32 +78,39 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
     try {
         const { login, email, password } = req.body;
-        // Accept either 'login' (username or email) or legacy 'email' field
         const identifier = (login || email || '').trim().toLowerCase();
+        
         if (!identifier || !password) {
             return res.status(400).json({ error: 'Username/email and password are required' });
         }
 
         const db = await getDatabase();
-        // Check if identifier looks like an email
         const isEmail = identifier.includes('@');
-        let user;
+        
+        let querySnapshot;
         if (isEmail) {
-            user = queryOne(db, 'SELECT * FROM users WHERE email = ?', [identifier]);
+            querySnapshot = await db.collection('users').where('email', '==', identifier).get();
         } else {
-            user = queryOne(db, 'SELECT * FROM users WHERE username = ?', [identifier]);
+            querySnapshot = await db.collection('users').where('username', '==', identifier).get();
         }
 
-        if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+        if (querySnapshot.empty) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
-        const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+        const userDoc = querySnapshot.docs[0];
+        const user = userDoc.data();
+
+        if (!bcrypt.compareSync(password, user.password_hash)) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+        const token = jwt.sign({ userId: userDoc.id }, JWT_SECRET, { expiresIn: '7d' });
 
         res.json({
             token,
             user: {
-                id: user.id, full_name: user.full_name, username: user.username, email: user.email,
+                id: userDoc.id, full_name: user.full_name, username: user.username, email: user.email,
                 role: user.role, language: user.language, created_at: user.created_at
             }
         });
@@ -106,8 +122,18 @@ router.post('/login', async (req, res) => {
 });
 
 // GET /api/auth/me
-router.get('/me', authenticate, (req, res) => {
-    res.json({ user: req.user });
+router.get('/me', authenticate, async (req, res) => {
+    try {
+        const u = req.user;
+        res.json({
+            user: {
+                id: u.id, full_name: u.full_name, username: u.username, email: u.email,
+                role: u.role, language: u.language, created_at: u.created_at
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Server error' });
+    }
 });
 
 // PUT /api/auth/language
@@ -117,10 +143,11 @@ router.put('/language', authenticate, async (req, res) => {
         if (!['ku', 'en', 'ar'].includes(language)) {
             return res.status(400).json({ error: 'Invalid language' });
         }
+
         const db = await getDatabase();
-        runSql(db, 'UPDATE users SET language = ? WHERE id = ?', [language, req.user.id]);
-        saveDatabase();
-        res.json({ success: true });
+        await db.collection('users').doc(req.user.id).update({ language });
+
+        res.json({ success: true, language });
     } catch (err) {
         res.status(500).json({ error: 'Server error' });
     }

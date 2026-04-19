@@ -1,6 +1,6 @@
 const express = require('express');
-const { authenticate, requireAdmin, queryOne, queryAll, runSql } = require('../middleware/auth');
-const { getDatabase, saveDatabase } = require('../database/init');
+const { authenticate, requireAdmin } = require('../middleware/auth');
+const { getDatabase } = require('../database/init');
 
 const router = express.Router();
 router.use(authenticate, requireAdmin);
@@ -11,19 +11,46 @@ router.get('/transactions', async (req, res) => {
         const db = await getDatabase();
         const { status, limit = 50 } = req.query;
 
-        let query = `SELECT t.*, u.full_name as user_name, u.email as user_email
-            FROM transactions t JOIN users u ON t.user_id = u.id`;
-        const params = [];
-
+        let query = db.collection('transactions');
         if (status && ['pending', 'approved', 'rejected', 'completed'].includes(status)) {
-            query += ' WHERE t.status = ?';
-            params.push(status);
+            query = query.where('status', '==', status);
         }
 
-        query += ' ORDER BY t.created_at DESC LIMIT ?';
-        params.push(parseInt(limit));
+        const snapshot = await query.get();
+        let transactions = [];
+        const userIds = new Set();
+        
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            transactions.push({ id: doc.id, ...data });
+            userIds.add(data.user_id);
+        });
 
-        const transactions = queryAll(db, query, params);
+        // Fast manual join for users
+        const usersMap = {};
+        if (userIds.size > 0) {
+            // Firestore 'in' has a limit of 30, so for safety we fetch all users or chunk them.
+            // For an admin panel with a limit=50, it's safer to fetch users for the returned txs.
+            const userRefs = Array.from(userIds).map(id => db.collection('users').doc(id));
+            if (userRefs.length > 0) {
+                const userDocs = await db.getAll(...userRefs);
+                userDocs.forEach(u => {
+                    if (u.exists) {
+                        usersMap[u.id] = u.data();
+                    }
+                });
+            }
+        }
+
+        transactions = transactions.map(t => ({
+            ...t,
+            user_name: usersMap[t.user_id]?.full_name || 'Unknown',
+            user_email: usersMap[t.user_id]?.email || 'Unknown'
+        }));
+
+        transactions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        transactions = transactions.slice(0, parseInt(limit));
+
         res.json({ transactions, total: transactions.length });
     } catch (err) {
         console.error('Admin get transactions error:', err);
@@ -40,21 +67,32 @@ router.patch('/transactions/:id', async (req, res) => {
         }
 
         const db = await getDatabase();
-        const transaction = queryOne(db, 'SELECT * FROM transactions WHERE id = ?', [req.params.id]);
-        if (!transaction) return res.status(404).json({ error: 'Transaction not found' });
+        const txRef = db.collection('transactions').doc(req.params.id);
+        const txDoc = await txRef.get();
+        if (!txDoc.exists) return res.status(404).json({ error: 'Transaction not found' });
 
-        runSql(db,
-            'UPDATE transactions SET status = ?, admin_note = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-            [status, admin_note || transaction.admin_note || '', parseInt(req.params.id)]
-        );
-        saveDatabase();
+        const updateData = {
+            status,
+            updated_at: new Date().toISOString()
+        };
+        if (admin_note !== undefined) {
+            updateData.admin_note = admin_note;
+        }
 
-        const updated = queryOne(db,
-            `SELECT t.*, u.full_name as user_name, u.email as user_email
-            FROM transactions t JOIN users u ON t.user_id = u.id WHERE t.id = ?`,
-            [parseInt(req.params.id)]
-        );
-        res.json({ transaction: updated });
+        await txRef.update(updateData);
+        
+        const updatedDoc = await txRef.get();
+        const tData = updatedDoc.data();
+        
+        // Manual join
+        let user_name = 'Unknown', user_email = 'Unknown';
+        const uDoc = await db.collection('users').doc(tData.user_id).get();
+        if (uDoc.exists) {
+            user_name = uDoc.data().full_name;
+            user_email = uDoc.data().email;
+        }
+
+        res.json({ transaction: { id: updatedDoc.id, ...tData, user_name, user_email } });
     } catch (err) {
         console.error('Admin update transaction error:', err);
         res.status(500).json({ error: 'Server error' });
@@ -65,12 +103,26 @@ router.patch('/transactions/:id', async (req, res) => {
 router.get('/users', async (req, res) => {
     try {
         const db = await getDatabase();
-        const users = queryAll(db, `
-            SELECT u.id, u.full_name, u.email, u.role, u.language, u.created_at,
-                COUNT(t.id) as transaction_count
-            FROM users u LEFT JOIN transactions t ON u.id = t.user_id
-            GROUP BY u.id ORDER BY u.created_at DESC
-        `, []);
+        
+        const usersSnap = await db.collection('users').get();
+        const txSnap = await db.collection('transactions').get();
+        
+        const txCounts = {};
+        txSnap.forEach(t => {
+            const uid = t.data().user_id;
+            txCounts[uid] = (txCounts[uid] || 0) + 1;
+        });
+
+        let users = [];
+        usersSnap.forEach(u => {
+            users.push({
+                id: u.id,
+                ...u.data(),
+                transaction_count: txCounts[u.id] || 0
+            });
+        });
+
+        users.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
         res.json({ users });
     } catch (err) {
         res.status(500).json({ error: 'Server error' });
@@ -81,24 +133,30 @@ router.get('/users', async (req, res) => {
 router.get('/stats', async (req, res) => {
     try {
         const db = await getDatabase();
-        const txStats = queryOne(db, `
-            SELECT COUNT(*) as total,
-                SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
-                SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) as approved,
-                SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
-                SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected,
-                COALESCE(SUM(CASE WHEN status = 'completed' THEN fee_amount ELSE 0 END), 0) as total_fees,
-                COALESCE(SUM(CASE WHEN status = 'completed' THEN send_amount ELSE 0 END), 0) as total_volume
-            FROM transactions
-        `, []);
+        
+        const txSnap = await db.collection('transactions').get();
+        const uSnap = await db.collection('users').where('role', '==', 'user').get();
 
-        const userCount = queryOne(db, "SELECT COUNT(*) as total FROM users WHERE role = 'user'", []);
-        res.json({ transactions: txStats, users: userCount ? userCount.total : 0 });
+        const txStats = { total: 0, pending: 0, approved: 0, completed: 0, rejected: 0, total_fees: 0, total_volume: 0 };
+        
+        txSnap.forEach(doc => {
+            txStats.total++;
+            const t = doc.data();
+            if (t.status === 'pending') txStats.pending++;
+            else if (t.status === 'approved') txStats.approved++;
+            else if (t.status === 'completed') {
+                txStats.completed++;
+                txStats.total_fees += t.fee_amount || 0;
+                txStats.total_volume += t.send_amount || 0;
+            }
+            else if (t.status === 'rejected') txStats.rejected++;
+        });
+
+        res.json({ transactions: txStats, users: uSnap.size });
     } catch (err) {
         res.status(500).json({ error: 'Server error' });
     }
 });
-
 
 // ============================================
 // CRUD API FOR METHOD FEES pairs
@@ -107,7 +165,9 @@ router.get('/stats', async (req, res) => {
 router.get('/method-fees', async (req, res) => {
     try {
         const db = await getDatabase();
-        const pairs = queryAll(db, 'SELECT * FROM method_fees ORDER BY id DESC', []);
+        const snapshot = await db.collection('method_fees').get();
+        const pairs = [];
+        snapshot.forEach(doc => pairs.push({ id: doc.id, ...doc.data() }));
         res.json({ pairs });
     } catch (err) {
         res.status(500).json({ error: 'Server error' });
@@ -123,19 +183,22 @@ router.post('/method-fees', async (req, res) => {
         }
 
         const db = await getDatabase();
-        const exists = queryOne(db, 'SELECT id FROM method_fees WHERE send_method = ? AND receive_method = ?', [send_method, receive_method]);
-        if (exists) {
+        const existsSnap = await db.collection('method_fees')
+            .where('send_method', '==', send_method)
+            .where('receive_method', '==', receive_method).get();
+
+        if (!existsSnap.empty) {
             return res.status(409).json({ error: 'A configuration for this pair already exists' });
         }
 
-        const result = runSql(db, 
-            'INSERT INTO method_fees (send_method, receive_method, base_amount, base_fee) VALUES (?, ?, ?, ?)',
-            [send_method, receive_method, parseFloat(base_amount), parseFloat(base_fee)]
-        );
-        saveDatabase();
+        const newData = {
+            send_method, receive_method, 
+            base_amount: parseFloat(base_amount), 
+            base_fee: parseFloat(base_fee)
+        };
+        const docRef = await db.collection('method_fees').add(newData);
         
-        const newPair = queryOne(db, 'SELECT * FROM method_fees WHERE id = ?', [result.lastInsertRowid]);
-        res.status(201).json({ pair: newPair });
+        res.status(201).json({ pair: { id: docRef.id, ...newData } });
     } catch (err) {
         res.status(500).json({ error: 'Server error' });
     }
@@ -144,8 +207,7 @@ router.post('/method-fees', async (req, res) => {
 router.delete('/method-fees/:id', async (req, res) => {
     try {
         const db = await getDatabase();
-        runSql(db, 'DELETE FROM method_fees WHERE id = ?', [req.params.id]);
-        saveDatabase();
+        await db.collection('method_fees').doc(req.params.id).delete();
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: 'Server error' });
@@ -164,13 +226,13 @@ router.post('/methods', async (req, res) => {
         }
         
         const db = await getDatabase();
-        const exists = queryOne(db, 'SELECT id FROM payment_methods WHERE id = ?', [id]);
-        if (exists) {
+        const ref = db.collection('payment_methods').doc(id);
+        const exists = await ref.get();
+        if (exists.exists) {
             return res.status(400).json({ error: 'A method with this ID already exists' });
         }
 
-        runSql(db, 'INSERT INTO payment_methods (id, name_key, icon, instructions) VALUES (?, ?, ?, ?)', [id, name_key, icon, instructions || '']);
-        saveDatabase();
+        await ref.set({ id, name_key, icon, instructions: instructions || '' });
         res.json({ success: true });
 
     } catch (err) {
@@ -182,8 +244,9 @@ router.put('/methods/:id', async (req, res) => {
     try {
         const { name_key, icon, instructions } = req.body;
         const db = await getDatabase();
-        runSql(db, 'UPDATE payment_methods SET name_key = ?, icon = ?, instructions = ? WHERE id = ?', [name_key, icon, instructions || '', req.params.id]);
-        saveDatabase();
+        await db.collection('payment_methods').doc(req.params.id).update({
+            name_key, icon, instructions: instructions || ''
+        });
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: 'Server error' });
@@ -193,14 +256,22 @@ router.put('/methods/:id', async (req, res) => {
 router.delete('/methods/:id', async (req, res) => {
     try {
         const db = await getDatabase();
-        runSql(db, 'DELETE FROM payment_methods WHERE id = ?', [req.params.id]);
-        runSql(db, 'DELETE FROM method_fees WHERE send_method = ? OR receive_method = ?', [req.params.id, req.params.id]);
-        saveDatabase();
+        await db.collection('payment_methods').doc(req.params.id).delete();
+
+        // Delete all associated fees
+        const feesRef = db.collection('method_fees');
+        const sSnap = await feesRef.where('send_method', '==', req.params.id).get();
+        const rSnap = await feesRef.where('receive_method', '==', req.params.id).get();
+        
+        const batch = db.batch();
+        sSnap.forEach(d => batch.delete(d.ref));
+        rSnap.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: 'Server error' });
     }
 });
-
 
 module.exports = router;

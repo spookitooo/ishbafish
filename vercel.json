@@ -10,7 +10,7 @@
           "database/**",
           "routes/**",
           "middleware/**",
-          "node_modules/sql.js/dist/sql-wasm.wasm"
+          "firebase-service-account.json"
         ]
       }
     }
