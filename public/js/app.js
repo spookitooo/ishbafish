@@ -54,7 +54,8 @@ async function api(endpoint, options = {}) {
         const data = await res.json();
 
         if (!res.ok) {
-            if (res.status === 401) {
+            // Don't auto-redirect 401s if we are currently trying to log in
+            if (res.status === 401 && !endpoint.includes('/login')) {
                 clearAuth();
                 window.location.href = '/login';
                 return null;
