@@ -11,7 +11,13 @@ let _db = null;
 async function getDatabase() {
     if (_db) return _db;
 
-    const SQL = await initSqlJs();
+    // Explicitly load the WASM binary so sql.js works on Vercel's serverless environment
+    const wasmPath = path.join(__dirname, '..', 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm');
+    let sqlConfig = {};
+    if (fs.existsSync(wasmPath)) {
+        sqlConfig.wasmBinary = fs.readFileSync(wasmPath);
+    }
+    const SQL = await initSqlJs(sqlConfig);
 
     // Load existing database or create new
     // On Vercel, the filesystem is read-only.

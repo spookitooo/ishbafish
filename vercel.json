@@ -9,7 +9,8 @@
           "public/**",
           "database/**",
           "routes/**",
-          "middleware/**"
+          "middleware/**",
+          "node_modules/sql.js/dist/sql-wasm.wasm"
         ]
       }
     }
