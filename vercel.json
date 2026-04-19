@@ -10,7 +10,7 @@
           "database/**",
           "routes/**",
           "middleware/**",
-          "firebase-service-account.json"
+          "database/**"
         ]
       }
     }
