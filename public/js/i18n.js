@@ -26,6 +26,10 @@ const translations = {
         login_here: 'لێرە بچۆ ژوورەوە',
         welcome_back: 'بەخێربێیتەوە',
         create_new_account: 'هەژماری نوێ دروست بکە',
+        username: 'ناوی بەکارهێنەر',
+        username_or_email: 'ناوی بەکارهێنەر یان ئیمەیڵ',
+        username_placeholder: 'بۆ نموونە: ayub_123',
+        username_hint: 'تەنها پیت، ژمارە، و _ بەکاربهێنە',
 
         // Navigation
         nav_exchange: 'ئاڵوگۆڕ',
@@ -159,6 +163,10 @@ const translations = {
         login_here: 'Login here',
         welcome_back: 'Welcome Back',
         create_new_account: 'Create New Account',
+        username: 'Username',
+        username_or_email: 'Username or Email',
+        username_placeholder: 'e.g. ayub_123',
+        username_hint: 'Only letters, numbers, and underscores',
 
         nav_exchange: 'Exchange',
         nav_history: 'History',
@@ -283,6 +291,10 @@ const translations = {
         login_here: 'سجل الدخول هنا',
         welcome_back: 'مرحباً بعودتك',
         create_new_account: 'إنشاء حساب جديد',
+        username: 'اسم المستخدم',
+        username_or_email: 'اسم المستخدم أو البريد الإلكتروني',
+        username_placeholder: 'مثال: ayub_123',
+        username_hint: 'أحرف وأرقام و _ فقط',
 
         nav_exchange: 'تبادل',
         nav_history: 'السجل',

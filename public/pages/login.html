@@ -2,7 +2,11 @@
 <html lang="ku" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#0a0a1a">
     <title>چوونەژوورەوە | Exchange Money</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -40,8 +44,8 @@
             <!-- Login Form -->
             <form id="login-form" onsubmit="handleLogin(event)">
                 <div class="form-group">
-                    <label class="form-label" data-i18n="email">ئیمەیڵ</label>
-                    <input type="email" id="login-email" class="form-input" data-i18n-placeholder="email" placeholder="ئیمەیڵ" required autocomplete="email">
+                    <label class="form-label" data-i18n="username_or_email">ناوی بەکارهێنەر یان ئیمەیڵ</label>
+                    <input type="text" id="login-identifier" class="form-input" data-i18n-placeholder="username_or_email" placeholder="ناوی بەکارهێنەر یان ئیمەیڵ" required autocomplete="username">
                 </div>
                 <div class="form-group">
                     <label class="form-label" data-i18n="password">وشەی نهێنی</label>
@@ -76,13 +80,13 @@
             const btn = document.getElementById('login-submit-btn');
             btn.disabled = true;
 
-            const email = document.getElementById('login-email').value;
+            const login = document.getElementById('login-identifier').value;
             const password = document.getElementById('login-password').value;
 
             try {
                 const data = await api('/auth/login', {
                     method: 'POST',
-                    body: { email, password }
+                    body: { login, password }
                 });
 
                 if (data) {

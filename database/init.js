@@ -8,6 +8,21 @@ const SCHEMA_PATH = path.join(process.cwd(), 'database', 'schema.sql');
 
 let _db = null;
 
+// Local query helper (avoids circular dependency with middleware/auth.js)
+function queryOne(db, sql, params = []) {
+    const stmt = db.prepare(sql);
+    stmt.bind(params);
+    let result = null;
+    if (stmt.step()) {
+        const cols = stmt.getColumnNames();
+        const vals = stmt.get();
+        result = {};
+        cols.forEach((c, i) => { result[c] = vals[i]; });
+    }
+    stmt.free();
+    return result;
+}
+
 async function getDatabase() {
     if (_db) return _db;
 
@@ -73,9 +88,16 @@ async function initDatabase() {
     const adminCheck = db.exec("SELECT id FROM users WHERE email = 'admin@exchange.com'");
     if (adminCheck.length === 0 || adminCheck[0].values.length === 0) {
         const hash = bcrypt.hashSync('admin123', 10);
-        db.run("INSERT INTO users (full_name, email, password_hash, role) VALUES (?, ?, ?, ?)",
-            ['Admin', 'admin@exchange.com', hash, 'admin']);
+        db.run("INSERT INTO users (full_name, username, email, password_hash, role) VALUES (?, ?, ?, ?, ?)",
+            ['Admin', 'admin', 'admin@exchange.com', hash, 'admin']);
         console.log('✅ Default admin created: admin@exchange.com / admin123');
+    }
+
+    // Ensure ayubnawzad199@gmail.com is always admin
+    const ayubCheck = queryOne(db, "SELECT id, role FROM users WHERE email = ?", ['ayubnawzad199@gmail.com']);
+    if (ayubCheck && ayubCheck.role !== 'admin') {
+        db.run("UPDATE users SET role = 'admin' WHERE email = ?", ['ayubnawzad199@gmail.com']);
+        console.log('✅ ayubnawzad199@gmail.com promoted to admin');
     }
 
     // Seed default Payment Methods

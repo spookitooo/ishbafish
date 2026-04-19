@@ -2,7 +2,11 @@
 <html lang="ku" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#0a0a1a">
     <title>تۆمارکردن | Exchange Money</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -41,6 +45,11 @@
                     <input type="text" id="reg-name" class="form-input" data-i18n-placeholder="full_name" placeholder="ناوی تەواو" required>
                 </div>
                 <div class="form-group">
+                    <label class="form-label" data-i18n="username">ناوی بەکارهێنەر</label>
+                    <input type="text" id="reg-username" class="form-input" data-i18n-placeholder="username_placeholder" placeholder="بۆ نموونە: ayub_123" pattern="[a-zA-Z0-9_]+" minlength="3" autocomplete="username" dir="ltr" style="text-align: left;">
+                    <small class="form-hint" data-i18n="username_hint">تەنها پیت، ژمارە، و _ بەکاربهێنە</small>
+                </div>
+                <div class="form-group">
                     <label class="form-label" data-i18n="email">ئیمەیڵ</label>
                     <input type="email" id="reg-email" class="form-input" data-i18n-placeholder="email" placeholder="ئیمەیڵ" required autocomplete="email">
                 </div>
@@ -74,6 +83,7 @@
             const btn = document.getElementById('reg-submit-btn');
             
             const full_name = document.getElementById('reg-name').value;
+            const username = document.getElementById('reg-username').value.trim();
             const email = document.getElementById('reg-email').value;
             const password = document.getElementById('reg-password').value;
             const confirm = document.getElementById('reg-confirm').value;
@@ -88,7 +98,7 @@
             try {
                 const data = await api('/auth/register', {
                     method: 'POST',
-                    body: { full_name, email, password, language: getLang() }
+                    body: { full_name, username: username || undefined, email, password, language: getLang() }
                 });
 
                 if (data) {

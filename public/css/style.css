@@ -933,31 +933,124 @@ body {
 
 .footer p { font-size: 0.78rem; color: var(--text-muted); }
 
+/* === Form Hint === */
+.form-hint {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-weight: 700;
+}
+
 /* === Selection === */
 ::selection { background: rgba(108, 99, 255, 0.3); color: white; }
 
+/* === Touch Optimization === */
+@media (pointer: coarse) {
+    .btn { min-height: 48px; }
+    .form-input, .form-select { min-height: 48px; font-size: 16px; }
+    .filter-btn { min-height: 40px; }
+    .nav-link { min-height: 44px; display: flex; align-items: center; }
+    .lang-btn { min-height: 36px; min-width: 40px; }
+}
+
 /* === Responsive === */
 @media (max-width: 768px) {
-    .nav-content { padding: 10px 16px; gap: 12px; }
+    html { font-size: 15px; }
+
+    .main-nav {
+        padding-top: env(safe-area-inset-top, 0);
+    }
+    .nav-content { padding: 10px 16px; gap: 8px; }
     .nav-user-name { display: none; }
     .nav-links { display: none; }
+    .nav-title { font-size: 1rem; }
+
     .method-select-group { grid-template-columns: 1fr; }
     .currency-amount-row { grid-template-columns: 120px 1fr; }
-    .stats-grid { grid-template-columns: repeat(2, 1fr); }
-    .admin-transaction-item { grid-template-columns: 1fr; gap: 8px; }
-    .page-container { padding: 20px 16px 48px; }
-    .exchange-form-card { padding: 24px 18px; }
-    .auth-card { padding: 28px 22px; }
-    .filter-bar { overflow-x: auto; flex-wrap: nowrap; }
-    .bg-orb { opacity: 0.15; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
+    .admin-transaction-item {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        padding: 14px 16px;
+    }
+
+    .admin-actions {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .transaction-item {
+        grid-template-columns: auto 1fr auto;
+        gap: 10px;
+        padding: 14px 16px;
+    }
+    .transaction-amount { grid-column: 1 / -1; display: flex; gap: 12px; align-items: center; }
+
+    .page-container { padding: 16px 14px 90px; }
+    .page-container.wide { padding: 16px 14px 90px; }
+    .page-header { margin-bottom: 20px; }
+    .page-header h2 { font-size: 1.5rem; }
+
+    .exchange-form-card { padding: 20px 16px; border-radius: var(--radius-lg); }
+    .auth-card { padding: 28px 20px; border-radius: var(--radius-lg); }
+    .card { padding: 20px 16px; border-radius: var(--radius-md); }
+
+    .filter-bar { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 4px; }
+    .filter-bar::-webkit-scrollbar { display: none; }
+    .filter-btn { flex-shrink: 0; }
+
+    .admin-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; scrollbar-width: none; }
+    .admin-tabs::-webkit-scrollbar { display: none; }
+    .admin-tab { flex-shrink: 0; white-space: nowrap; font-size: 0.82rem; padding: 10px 14px; }
+
+    .preview-box { padding: 16px; }
+
+    .bg-orb { opacity: 0.12; }
+
+    /* Toast at bottom above mobile nav */
+    .toast-notification { bottom: 80px; }
+
+    .stat-card { padding: 14px 12px; }
+    .stat-value { font-size: 1.3rem; }
+    .stat-label { font-size: 0.72rem; }
+
+    .user-list-item {
+        grid-template-columns: 36px 1fr;
+        gap: 10px;
+    }
+    .user-list-item > *:nth-child(3),
+    .user-list-item > *:nth-child(4) {
+        grid-column: 2;
+    }
 }
 
 @media (max-width: 480px) {
+    html { font-size: 14px; }
+
     .lang-switcher { display: flex; }
     .lang-btn { padding: 4px 8px; font-size: 0.7rem; }
+
     .stats-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
-    .stat-card { padding: 14px; }
-    .stat-value { font-size: 1.3rem; }
+    .stat-card { padding: 12px 10px; }
+    .stat-value { font-size: 1.2rem; }
+
+    .auth-card { padding: 24px 16px; margin: 0 8px; }
+    .auth-logo-icon { width: 50px; height: 50px; }
+    .auth-logo h1 { font-size: 1.3rem; }
+
+    .nav-content { padding: 8px 12px; }
+    .nav-logo-icon { width: 32px; height: 32px; }
+
+    .preview-row { flex-direction: column; align-items: flex-start; gap: 2px; }
+
+    .method-settings-grid { grid-template-columns: 1fr !important; }
+}
+
+@media (max-width: 360px) {
+    .stats-grid { grid-template-columns: 1fr; }
+    .exchange-form-card { padding: 16px 12px; }
 }
 
 /* === Mobile Navigation === */
@@ -968,38 +1061,64 @@ body {
     left: 0;
     right: 0;
     z-index: 100;
-    background: rgba(10, 10, 26, 0.9);
-    backdrop-filter: blur(20px);
+    background: rgba(10, 10, 26, 0.95);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
     border-top: 1px solid var(--border-color);
-    padding: 8px 0 env(safe-area-inset-bottom, 8px);
+    padding: 6px 0 env(safe-area-inset-bottom, 8px);
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.3);
 }
 
 .mobile-nav-links {
     display: flex;
     justify-content: space-around;
+    max-width: 400px;
+    margin: 0 auto;
 }
 
 .mobile-nav-link {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 2px;
-    padding: 8px 12px;
+    gap: 3px;
+    padding: 8px 16px;
     text-decoration: none;
     color: var(--text-muted);
     font-size: 0.68rem;
     font-weight: 700;
     transition: var(--transition-fast);
+    position: relative;
+    -webkit-tap-highlight-color: transparent;
 }
 
-.mobile-nav-link.active { color: var(--accent-primary); }
+.mobile-nav-link:active {
+    transform: scale(0.92);
+}
+
+.mobile-nav-link.active {
+    color: var(--accent-primary);
+}
+
+.mobile-nav-link.active::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 24px;
+    height: 3px;
+    background: var(--gradient-primary);
+    border-radius: 0 0 4px 4px;
+}
+
 .mobile-nav-link svg { width: 22px; height: 22px; }
 
 @media (max-width: 768px) {
     .mobile-nav { display: block; }
-    body { padding-bottom: 70px; }
+    body { padding-bottom: 76px; }
 }
 
+/* === Reduce Motion === */
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
         animation-duration: 0.01ms !important;

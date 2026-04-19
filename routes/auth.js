@@ -9,7 +9,7 @@ const router = express.Router();
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
     try {
-        const { full_name, email, password, language } = req.body;
+        const { full_name, username, email, password, language } = req.body;
 
         if (!full_name || !email || !password) {
             return res.status(400).json({ error: 'All fields are required' });
@@ -22,21 +22,39 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ error: 'Invalid email format' });
         }
 
+        // Validate username if provided
+        if (username) {
+            if (username.length < 3) {
+                return res.status(400).json({ error: 'Username must be at least 3 characters' });
+            }
+            if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+                return res.status(400).json({ error: 'Username can only contain letters, numbers, and underscores' });
+            }
+        }
+
         const db = await getDatabase();
         const existing = queryOne(db, 'SELECT id FROM users WHERE email = ?', [email.toLowerCase()]);
         if (existing) {
             return res.status(409).json({ error: 'Email already registered' });
         }
 
+        // Check username uniqueness if provided
+        if (username) {
+            const existingUsername = queryOne(db, 'SELECT id FROM users WHERE username = ?', [username.toLowerCase()]);
+            if (existingUsername) {
+                return res.status(409).json({ error: 'Username already taken' });
+            }
+        }
+
         const password_hash = bcrypt.hashSync(password, 10);
         const result = runSql(db,
-            'INSERT INTO users (full_name, email, password_hash, language) VALUES (?, ?, ?, ?)',
-            [full_name, email.toLowerCase(), password_hash, language || 'ku']
+            'INSERT INTO users (full_name, username, email, password_hash, language) VALUES (?, ?, ?, ?, ?)',
+            [full_name, username ? username.toLowerCase() : null, email.toLowerCase(), password_hash, language || 'ku']
         );
         saveDatabase();
 
         const token = jwt.sign({ userId: result.lastInsertRowid }, JWT_SECRET, { expiresIn: '7d' });
-        const user = queryOne(db, 'SELECT id, full_name, email, role, language, created_at FROM users WHERE id = ?', [result.lastInsertRowid]);
+        const user = queryOne(db, 'SELECT id, full_name, username, email, role, language, created_at FROM users WHERE id = ?', [result.lastInsertRowid]);
 
         res.status(201).json({ token, user });
     } catch (err) {
@@ -50,16 +68,25 @@ router.post('/register', async (req, res) => {
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
     try {
-        const { email, password } = req.body;
-        if (!email || !password) {
-            return res.status(400).json({ error: 'Email and password are required' });
+        const { login, email, password } = req.body;
+        // Accept either 'login' (username or email) or legacy 'email' field
+        const identifier = (login || email || '').trim().toLowerCase();
+        if (!identifier || !password) {
+            return res.status(400).json({ error: 'Username/email and password are required' });
         }
 
         const db = await getDatabase();
-        const user = queryOne(db, 'SELECT * FROM users WHERE email = ?', [email.toLowerCase()]);
+        // Check if identifier looks like an email
+        const isEmail = identifier.includes('@');
+        let user;
+        if (isEmail) {
+            user = queryOne(db, 'SELECT * FROM users WHERE email = ?', [identifier]);
+        } else {
+            user = queryOne(db, 'SELECT * FROM users WHERE username = ?', [identifier]);
+        }
 
         if (!user || !bcrypt.compareSync(password, user.password_hash)) {
-            return res.status(401).json({ error: 'Invalid email or password' });
+            return res.status(401).json({ error: 'Invalid credentials' });
         }
 
         const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
@@ -67,7 +94,7 @@ router.post('/login', async (req, res) => {
         res.json({
             token,
             user: {
-                id: user.id, full_name: user.full_name, email: user.email,
+                id: user.id, full_name: user.full_name, username: user.username, email: user.email,
                 role: user.role, language: user.language, created_at: user.created_at
             }
         });
@@ -75,6 +102,7 @@ router.post('/login', async (req, res) => {
         console.error('Login error:', err);
         res.status(500).json({ error: 'Server error' });
     }
+
 });
 
 // GET /api/auth/me
